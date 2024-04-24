@@ -198,7 +198,7 @@ node1    Ready    <none>          45m   v1.28.6
 node2    Ready    <none>          45m   v1.28.6
 
 ```
-<details><summary>Дальше пока не сделал </summary>
+<details><summary>Прошу прощения, дальше пока не сделал </summary>
 
 ### Создание тестового приложения
 
