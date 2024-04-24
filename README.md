@@ -135,18 +135,18 @@ zag1988@mytest6:~/devops-diplom-yandexcloud/terraform2$ yc compute instance list
 
 1. Для установки кластера  k8s воспользовался отредактированной конфигурацией ansible из [Kubespray](https://kubernetes.io/docs/setup/production-environment/tools/kubespray/):
    - При развертывании игфраструктуры через terraform, для использования ansible, прокинули публичные ключи [main.tf](terraform2/main.tf);
-   - Склонировал репозеторий Kubespray git clone https://github.com/kubernetes-sigs/kubespray.git на локальную машину;
-   - Переименовал каталог с inventory: cd kubespray/ &&  cp -rfp inventory/sample inventory/mycluster;
-   - Установил необходимые зависимости для выполнения playbook kubespray из requirements: pip install -U -r requirements.txt
+   - Склонировал репозиторий Kubespray: **git clone https://github.com/kubernetes-sigs/kubespray.git** на локальную машину;
+   - Переименовал каталог с inventory: **cd kubespray/ &&  cp -rfp inventory/sample inventory/mycluster**;
+   - Установил необходимые зависимости для выполнения playbook kubespray из requirements: **pip install -U -r requirements.txt**
    - Заменил inventory файл host.ymal в каталоге ~/kubespray/inventory/mycluster/group_vars/ на динамически сгененированный terraform [pre_kubespray](terraform2/pre_kubespray.tf) на [hosts.yaml](terraform2/hosts.yaml); 
-   - Для того, чтобы кластер k8s был доступен из интернета, в конфигах изменил параметр supplementary_addresses_in_ssl_keys [supplementary_addresses_in_ssl_keys](kubespray/mycluster/group_vars/k8s_cluster/k8s-cluster.yml) на "master_external_ipv4"
-   - Запустил playbook для установки кластера k8s: "ansible-playbook -i inventory/mycluster/group_vars/hosts.yaml cluster.yml -b -v"
+   - Для того, чтобы кластер k8s был доступен из интернета, в конфигах изменил параметр supplementary_addresses_in_ssl_keys [supplementary_addresses_in_ssl_keys](kubespray/mycluster/group_vars/k8s_cluster/k8s-cluster.yml) на "master_external_ipv4": [158.160.32.251]
+   - Запустил playbook для установки кластера k8s: **ansible-playbook -i inventory/mycluster/group_vars/hosts.yaml cluster.yml -b -v**
    - Playbook успешно завершился:
-     ![PLAY RECAP](IMG/kubespray.PNG)
-   - Проверим, что кластер доступен по внешнему адресу, который задавали в конфигах:
+   ![PLAY RECAP](IMG/kubespray.PNG)
+   - Проверил, что кластер доступен по внешнему адресу, который задавали в конфигах:
 
    ![alt text](<IMG/external IP.PNG>)
-   - заходим на мастер ноду кластера, и проверяем доступность сонфигурационных файлов и созданных pods:
+   - заходим на мастер ноду кластера, и проверяем доступность конфишурационных файлов и созданных pods:
 ```shell
    ubuntu@master:~$ cat ~/.kube/config 
 apiVersion: v1
