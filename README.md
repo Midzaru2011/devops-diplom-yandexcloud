@@ -60,7 +60,8 @@
 
 ## Решение
 
-1. Создал сервисный аккаунт для управления облаком с помощью terraform:
+1. Для создания облачной инфрструктуры были созданы файлы конфигурации [Terraform](https://github.com/Midzaru2011/devops-diplom-yandexcloud/tree/main/terraform2).  
+Для управлением облачной инфраструктурой, был создан сервисный аккаунт:
 
 ```shell
 zag1988@mytest6:~/devops-diplom-yandexcloud/terraform2$ yc iam service-account list
@@ -88,9 +89,11 @@ is 1.8.1. You can update by downloading from https://www.terraform.io/downloads.
 
 3. Конфигурация terraform для создания требуемой архитектуры [terraform2](terraform2):
    В данной конфигурации создаются:
-   * VPC c подсетями разных зонах доступности:
+   * _VPC c подсетями разных зонах доступности:_
+
    ![VPC](IMG/VPC.PNG)
-   * Создается bucket, куда отправляется файл terraform.tfstate, который используется в качестве backend:
+   * _Создается bucket, куда отправляется файл terraform.tfstate, который используется в качестве backend:_
+
    ![Bucket](<IMG/bucket for backend.PNG>)
 
 4. Также были созданы четыре виртуальные машины, которые будут использованы в дальнейшем для установки кластера k8s и jenkins:
@@ -143,12 +146,12 @@ zag1988@compute-vm-4-4-70-hdd-1725199716918:~$ yc compute instance list
    * Установил необходимые зависимости для выполнения playbook kubespray из requirements: **pip install -U -r requirements.txt**
    * Заменил inventory файл host.ymal в каталоге ~/kubespray/inventory/mycluster/group_vars/ на динамически сгененированный terraform [pre_kubespray](terraform2/pre_kubespray.tf) на [hosts.yaml](kubespray/inventory/mycluster/hosts.yaml);
    * Для того, чтобы кластер k8s был доступен из интернета, в конфигах изменил параметр supplementary_addresses_in_ssl_keys [supplementary_addresses_in_ssl_keys](kubespray/mycluster/group_vars/k8s_cluster/k8s-cluster.yml) на EXTERNAL IP  node-0, которая будет выступать мастер нодой;  
-   * Запустил playbook для установки кластера k8s: **ansible-playbook -i inventory/mycluster/hosts.yaml  --become --become-user=root cluster.yml**
+   * Запустил playbook для установки кластера k8s: **ansible-playbook -i inventory/mycluster/hosts.yaml  --become --become-user=root cluster.yml**;
    * Playbook успешно завершился:
-   ![PLAY RECAP](<IMG/kuberspray.PNG>)
+      ![PLAY RECAP](<IMG/kuberspray.PNG>)
    * Проверил, что кластер доступен по внешнему адресу, который задавали в конфигах:
 
-   ![alt text](<IMG/external IP.PNG>)
+      ![alt text](<IMG/external IP.PNG>)
    * заходим на мастер ноду кластера, и проверяем доступность конфигурационных файлов и созданных pods:
 
 <details><summary>cat ~/.kube/config </summary>
