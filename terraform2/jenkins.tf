@@ -1,15 +1,11 @@
-
-resource "yandex_compute_instance" "cluster" {  
-  count = 3
-  name                      = "node-${count.index}"
-  zone                      = "${var.subnet-zone[count.index]}"
-  hostname                  = "node-${count.index}"
+resource "yandex_compute_instance" "jenkins" {  
+  count = 1
+  name                      = local.instance_jenkins
+  zone                      = var.zone_a
+  hostname                  = local.instance_jenkins
   allow_stopping_for_update = true
   platform_id = "standard-v2"
-  labels = {
-    index = "${count.index}"
-  }
- 
+
   scheduling_policy {
   preemptible = true  // Прерываемая ВМ
   }
@@ -37,10 +33,14 @@ resource "yandex_compute_instance" "cluster" {
   metadata = {
     ssh-keys = "ubuntu:${file("~/.ssh/id_rsa.pub")}"
   }
+
+  provisioner "local-exec" {
+    command = "sleep 15"  
+  }
+
   provisioner "file" {
-    source      = "~/.ssh/id_rsa"
-    destination = "/home/ubuntu/.ssh/id_rsa"
-    
+    source      = "./jenkins-install.sh"
+    destination = "/home/ubuntu/jenkins-install.sh"
     connection {
       type        = "ssh"
       user        = "ubuntu"
@@ -49,15 +49,18 @@ resource "yandex_compute_instance" "cluster" {
     }
   }
 
-   provisioner "remote-exec" {
-    inline = [
-      "chmod 600 /home/ubuntu/.ssh/id_rsa"
-    ] 
+  provisioner "remote-exec" {
+    
     connection {
       type        = "ssh"
       user        = "ubuntu"
       private_key = file("~/.ssh/id_rsa")
-      host      = self.network_interface[0].nat_ip_address
+      host        = self.network_interface[0].nat_ip_address
     }
+
+    inline = [
+      "sudo chmod +x /home/ubuntu/jenkins-install.sh",
+      "sudo sh /home/ubuntu/jenkins-install.sh"
+    ]
   }
 }

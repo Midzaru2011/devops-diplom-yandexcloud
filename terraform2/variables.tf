@@ -10,17 +10,17 @@ variable "folder_id" {
   description = ""
 }
 
-# variable "subnet-zone" {
-#   type    = list(string)
-#   default = ["ru-central1-a", "ru-central1-b", "ru-central1-d"]
-# }
+variable "subnet-zone" {
+  type    = list(string)
+  default = ["ru-central1-a", "ru-central1-b", "ru-central1-d"]
+}
 
-# variable "cidr" {
-#   type    = map(list(string))
-#   default = {
-#     stage = ["10.10.1.0/24", "10.10.2.0/24", "10.10.3.0/24"]    
-#   }
-# }
+variable "cidr" {
+  type    = map(list(string))
+  default = {
+    stage = ["10.10.1.0/24", "10.10.2.0/24", "10.10.3.0/24"]    
+  }
+}
 
 variable "zone_a" {
   type = string
@@ -40,11 +40,6 @@ variable "zone_d" {
   description = "Default zone for resources"
 }
 
-# variable "subnet_cidr" {
-#   type        = map(list(string))
-#   default     = ["192.168.10.0/24"]
-#   description = "https://cloud.yandex.ru/docs/vpc/operations/subnet-create"
-# }
 
 variable "vpc_name" {
   type        = string
@@ -72,8 +67,8 @@ variable "public_resources" {
   type = map(number)
   default = {
     cores         = 2
-    memory        = 2
-    core_fraction = 20
+    memory        = 4
+    core_fraction = 50
   }
 }
 
@@ -98,7 +93,7 @@ variable "nat_resources" {
   type = map(number)
   default = {
     cores         = 2
-    memory        = 2
+    memory        = 4
     core_fraction = 20
   }
 }
@@ -129,8 +124,8 @@ variable "private_resources" {
   type = map(number)
   default = {
     cores         = 2
-    memory        = 2
-    core_fraction = 20
+    memory        = 4
+    core_fraction = 50
   }
 }
 
