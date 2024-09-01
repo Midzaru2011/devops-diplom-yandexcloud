@@ -94,16 +94,16 @@ is 1.8.1. You can update by downloading from https://www.terraform.io/downloads.
 4. Также были созданы четыре виртуальные машины, которые будут использованы в дальнейшем для установки кластера k8s и jenkins:
 
 ```shell
-zag1988@mytest6:~/devops-diplom-yandexcloud/terraform2$ yc compute instance list
-+----------------------+---------+---------------+---------+-----------------+-------------+
-|          ID          |  NAME   |    ZONE ID    | STATUS  |   EXTERNAL IP   | INTERNAL IP |
-+----------------------+---------+---------------+---------+-----------------+-------------+
-| epd0dvnl64d2ti00eso7 | worker1 | ru-central1-b | RUNNING | 84.201.167.176  | 10.0.2.22   |
-| fhm0csp7h02pl7jmavav | master  | ru-central1-a | RUNNING | 158.160.32.251  | 10.0.1.6    |
-| fhm1mur16p0hg1tbdrrv | mytest6 | ru-central1-a | RUNNING | 158.160.121.102 | 10.128.0.35 |
-| fhme9n84271f51eramfj | jenkins | ru-central1-a | RUNNING | 51.250.90.142   | 10.0.1.33   |
-| fv4458pgl175iobchajn | worker2 | ru-central1-d | RUNNING | 158.160.153.252 | 10.0.3.17   |
-+----------------------+---------+---------------+---------+-----------------+-------------+
+zag1988@compute-vm-4-4-70-hdd-1725199716918:~$ yc compute instance list
++----------------------+-------------------------------------+---------------+---------+----------------+-------------+
+|          ID          |                NAME                 |    ZONE ID    | STATUS  |  EXTERNAL IP   | INTERNAL IP |
++----------------------+-------------------------------------+---------------+---------+----------------+-------------+
+| epd46igg0o68omfjj6ap | node-1                              | ru-central1-b | RUNNING | 84.252.139.108 | 10.10.2.24  |
+| fhm0u2e6lshfe0pkci5d | node-0                              | ru-central1-a | RUNNING | 89.169.152.199 | 10.10.1.31  |
+| fhm638ghmkm6mkhtmlb3 | compute-vm-4-4-70-hdd-1725199716918 | ru-central1-a | RUNNING | 62.84.127.224  | 10.128.0.28 |
+| fhmjqjl6dtkb38of7mf5 | jenkins                             | ru-central1-a | RUNNING | 89.169.150.99  | 10.10.1.24  |
+| fv4gotoa0gd38s9rduhk | node-2                              | ru-central1-d | RUNNING | 51.250.36.147  | 10.10.3.33  |
++----------------------+-------------------------------------+---------------+---------+----------------+-------------+
 ```
 
 ### Создание Kubernetes кластера
@@ -134,26 +134,28 @@ zag1988@mytest6:~/devops-diplom-yandexcloud/terraform2$ yc compute instance list
 ## Решение
 
 1. Для установки кластера  k8s воспользовался отредактированной конфигурацией ansible из [Kubespray](https://kubernetes.io/docs/setup/production-environment/tools/kubespray/):
-   - При развертывании игфраструктуры через terraform, для использования ansible, прокинули публичные ключи [main.tf](terraform2/main.tf);
+   - При развертывании инфраструктуры через terraform, для использования ansible, прокинули публичные ключи [main.tf](terraform2/main.tf);
    - Склонировал репозиторий Kubespray: **git clone https://github.com/kubernetes-sigs/kubespray.git** на локальную машину;
    - Переименовал каталог с inventory: **cd kubespray/ &&  cp -rfp inventory/sample inventory/mycluster**;
    - Установил необходимые зависимости для выполнения playbook kubespray из requirements: **pip install -U -r requirements.txt**
-   - Заменил inventory файл host.ymal в каталоге ~/kubespray/inventory/mycluster/group_vars/ на динамически сгененированный terraform [pre_kubespray](terraform2/pre_kubespray.tf) на [hosts.yaml](terraform2/hosts.yaml); 
-   - Для того, чтобы кластер k8s был доступен из интернета, в конфигах изменил параметр supplementary_addresses_in_ssl_keys [supplementary_addresses_in_ssl_keys](kubespray/mycluster/group_vars/k8s_cluster/k8s-cluster.yml) на "master_external_ipv4": [158.160.32.251]
-   - Запустил playbook для установки кластера k8s: **ansible-playbook -i inventory/mycluster/group_vars/hosts.yaml cluster.yml -b -v**
+   - Заменил inventory файл host.ymal в каталоге ~/kubespray/inventory/mycluster/group_vars/ на динамически сгененированный terraform [pre_kubespray](terraform2/pre_kubespray.tf) на [hosts.yaml](kubespray/inventory/mycluster/hosts.yaml); 
+   - Для того, чтобы кластер k8s был доступен из интернета, в конфигах изменил параметр supplementary_addresses_in_ssl_keys [supplementary_addresses_in_ssl_keys](kubespray/mycluster/group_vars/k8s_cluster/k8s-cluster.yml) на EXTERNAL IP  node-0, которая будет выступать мастер нодой;  
+   - Запустил playbook для установки кластера k8s: **ansible-playbook -i inventory/mycluster/hosts.yaml  --become --become-user=root cluster.yml**
    - Playbook успешно завершился:
-   ![PLAY RECAP](IMG/kubespray.PNG)
+   ![PLAY RECAP](<IMG/kuberspray.PNG>)
    - Проверил, что кластер доступен по внешнему адресу, который задавали в конфигах:
 
    ![alt text](<IMG/external IP.PNG>)
    - заходим на мастер ноду кластера, и проверяем доступность конфигурационных файлов и созданных pods:
+
+<details><summary>cat ~/.kube/config </summary>
+
 ```shell
-   ubuntu@master:~$ cat ~/.kube/config 
 apiVersion: v1
 clusters:
 - cluster:
-    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURCVENDQWUyZ0F3SUJBZ0lJUDAza0dCZmlsZDB3RFFZSktvWklodmNOQVFFTEJRQXdGVEVUTUJFR0ExVUUKQXhNS2EzVmlaWEp1WlhSbGN6QWVGdzB5TkRBME1qUXhOak14TXpaYUZ3MHpOREEwTWpJeE5qTTJNelphTUJVeApFekFSQmdOVkJBTVRDbXQxWW1WeWJtVjBaWE13Z2dFaU1BMEdDU3FHU0liM0RRRUJBUVVBQTRJQkR3QXdnZ0VLCkFvSUJBUUMzSVBnenA4YXU4VUx3MUJQQUJ6eDBmd29GYW1HVDVGZjlSZ09idmdNK3pLTlh1cXRmK3NNM3ZSbSsKWmx5N3F2SnJsSzc3b2V2NUR0dm5ScGd6OXQzMklTYkY1WHAwblRINkVaTXBRUHRnQVhoY3NqbG5kYXpMMEZpQgp1aERFakVhNlFyb2FaOXlJcTdjSHlFUWRyd0gxWklvNWtmTlJBZW1RQm8rU1BLdXdxMXZDUGZMcVBsTWtGczl3Ck8yNDRmU3NwT00wVCt0VGlnU3JmbjlHaXY2b1RMNUxjL3RGYzQxa091a2NWVnIwellXdTFUbG5PUmJvWVM5Ky8KS2lQNTF5SzUvVkVmZWsvRUhVNDVRSUNUVzJqWnpxVlpHdmNiNncwWGZzTmkvWG9qNUpRaVdidnFNSWJpbzRpTwo2S2V6Mkh2YUVzUVh6azNNV2RoTkxzRnlyT0RGQWdNQkFBR2pXVEJYTUE0R0ExVWREd0VCL3dRRUF3SUNwREFQCkJnTlZIUk1CQWY4RUJUQURBUUgvTUIwR0ExVWREZ1FXQkJUYVJsd0NORHpSVTQ4bVIwT21vekgxTkNCVUx6QVYKQmdOVkhSRUVEakFNZ2dwcmRXSmxjbTVsZEdWek1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQkFRQnAvaHdjdkZJeQpGVjhxWVVkTEoyWjk1bDkwenZoalVtRzRXeHpSRzk0d0VoTU9jVUV2WFQxNnF1TG1ERlZURHdudFBlcllBR1NkCmw5UCsvb0piei81RnFmMUpvUVpxeWs5a0ZHQjBwVHljejkrODV2RlR2NWREYjd2OURFc0dPVXF5VkFDRjdvT24Kc1orWXNyMDBMVGZCanpub0UybHZnRTNVTWZ5NzlrVE5HbUhDb0hMOEdERVFNTGpHVUlTYWdCN21MaUt0WFJUOApKMjhWWGVYWkZ5MW1MNVN0N1JQUzN2aWVKL3UvRmN6L0ZMVlZBaHFsejFRSXRPVFVqSzFwRk1iRUZHL29vc0JaCktWY2NmZUNjR3dlRGlRZFVPWGZHc1FWTFozU2lWTTMrWG1PTWlEd1dCZyttQkovV1JOU09XWTRVWVdBM2lUSjgKcEdsSW9lWWJ3UldlCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
-    server: https://158.160.32.251:6443
+    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURCVENDQWUyZ0F3SUJBZ0lJRUJpTEp3bVNaZGd3RFFZSktvWklodmNOQVFFTEJRQXdGVEVUTUJFR0ExVUUKQXhNS2EzVmlaWEp1WlhSbGN6QWVGdzB5TkRBNU1ERXhORFV5TWpsYUZ3MHpOREE0TXpBeE5EVTNNamxhTUJVeApFekFSQmdOVkJBTVRDbXQxWW1WeWJtVjBaWE13Z2dFaU1BMEdDU3FHU0liM0RRRUJBUVVBQTRJQkR3QXdnZ0VLCkFvSUJBUURtVldBdDFjSlVPMWloVUV2Z3ozdkt1c0lnOUdtZnhOUnFXZ3FGQTRyR0tCcEZ1cXNVbzNqVEhxMmsKUTBNSThkaW5zQ3JGT29iVWFKbkg1K0g0am9BUFY2NDRMVHo1bzJKZCtNYi9xOGtZZkdEbjE2VnpmQnBzOHBHYwpKS2d3QXR2aHRzamRiYklxKy9KTXVwTnh4d2pNNlE2cG1DamhzL05ra2NsUDJhZ254RWhxeWxNdkJUNFY0V21OCjI0bElnYjNFMDE4d0NDbU5ObVJEdjVLeEQ2QWJCSDVMNFFwM0ZxN3dzRnJOeFR6R1F0S3VmRDBBcGlpb29MVXoKaW1iU0xIL2QwSEI4T1YyL0F1M2c4eEJ4d05xK3k2anZ4eHBzckN0VEtnQ1JqaWhtQU5nT2RTQ3VJSGo5VUY2UwpxZmdrKzUxaE93SnVOdGNtRlN4YkFneW8ybHVIQWdNQkFBR2pXVEJYTUE0R0ExVWREd0VCL3dRRUF3SUNwREFQCkJnTlZIUk1CQWY4RUJUQURBUUgvTUIwR0ExVWREZ1FXQkJUVk9iN1lwc281UEgvcTFQTFVoTGN5UlVqZy96QVYKQmdOVkhSRUVEakFNZ2dwcmRXSmxjbTVsZEdWek1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQkFRRGtpencvcHl5dApYQk1DTWpFTi90c1JWQitFRGd0eVJyMzFhWjdkMXMzVzBFK1ZxdXpTNzZKMDRoRWdiRm05VHFYMjVkYS8zSlJoCmpCV2cwRXBDai8xZWwxcFk0bmFOTUtWdnZ2NzhnYVc1emt4bUp5YW9razR5dWVGU1ptQm1XWTRuWFhxNFM0dFcKcTN0MnI5ODhJSGRmN2tFaER0RWJsV2NROHR1bEE3UkF2eURYemhtckdIaWtHZmVmdDJNbklmSlVIbldmQ3YrZQpFbXFmazdTMzhLNlBWTjdDd0daeTlPR28rcEk0SE40aWpLUkR3V3ZjSEpISGkxYXNUQ0hHQzJGTDFoMDFRMFhQCmVxKzhxRi81V0l0L3pWekhMR0pBYXNPcUxGYStBdjhBUFVkN3JwS3VURERRVmlheFIxTER0cDQxakhLSGNmNWIKbGxKbkpnMEdPVW1KCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+    server: https://89.169.152.199:6443
   name: cluster.local
 contexts:
 - context:
@@ -166,39 +168,55 @@ preferences: {}
 users:
 - name: kubernetes-admin
   user:
-    client-certificate-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURJVENDQWdtZ0F3SUJBZ0lJSllRR0R4ZUxUR1l3RFFZSktvWklodmNOQVFFTEJRQXdGVEVUTUJFR0ExVUUKQXhNS2EzVmlaWEp1WlhSbGN6QWVGdzB5TkRBME1qUXhOak14TXpaYUZ3MHlOVEEwTWpReE5qTTJNemhhTURReApGekFWQmdOVkJBb1REbk41YzNSbGJUcHRZWE4wWlhKek1Sa3dGd1lEVlFRREV4QnJkV0psY201bGRHVnpMV0ZrCmJXbHVNSUlCSWpBTkJna3Foa2lHOXcwQkFRRUZBQU9DQVE4QU1JSUJDZ0tDQVFFQTZnOGZ1Z2JQbnNRUlgzUEsKSnFWaUQwbVBPSEVlbGlWN2txcy9Cd0pHUnA3bFZVRnZNN1BXNWtNcUlaYi96NFV4elE0ZlptL2pQQ1NJVGNjcQpGTzRPMnFkMDVxbU83RTJobWRST3hUUWtCZ3VPMTh3N3VHWUZPTC9BTkwwcm8zT0lQdisraE9zNDRrT2c1QjRXClpRZHBvNkY4Z1h2QmN0MlJFaVVqRldJQ3N4T3RFa3ZYSXRhOVBEWnNnaVFiNXVmVWZ0RVJ5cjhXNXFvQ0pQdVcKK3dnNVhXcmZjdmFNMEdES2xXSzZSdE0xZ2h0TFliS3N4KzNMN1BNQUVqSUdtQXdQS1J0eTJQRHlkSis0Q3ZKagpYckZSd0lWVVcycGhRdUd0SHpzYk1HRFVkQmZnWXFGcm1zMDdOTG5IRVNpSnk2eDdiT2ZVbEZGTzMvNk4xWGcrCmU2UENSUUlEQVFBQm8xWXdWREFPQmdOVkhROEJBZjhFQkFNQ0JhQXdFd1lEVlIwbEJBd3dDZ1lJS3dZQkJRVUgKQXdJd0RBWURWUjBUQVFIL0JBSXdBREFmQmdOVkhTTUVHREFXZ0JUYVJsd0NORHpSVTQ4bVIwT21vekgxTkNCVQpMekFOQmdrcWhraUc5dzBCQVFzRkFBT0NBUUVBVHloM0Q4UU8vN01FczhBTThOd2JRbE5TSXBPbWVMd2UyeFNpClowam43TVYvcW1uRXo4Mlp1YkpMWThsNjVpYTc1NzRKOUgwTzk2TVVseWFxdk9iK0JDTTZFVUpKc0V2ZjFBZkcKQlYwb1JEaGRld0FiVEZjUFQ0SU5OZG1OZmowbzVqTTd5OHBVL0ZLblhCNHpXenlXMzlQQXNabmNQL0gvUHdMcQpseTBDOW96YUxFV0Q4RGVOMGlvMmNJcEtpaDFKYmEwejdkYmlrZTQ3Z1dzdVQ5QTdMMTZjSmdpNlFka2RUUWdCCmpVaHVEdzZTdk96bC83a3Y3S0g3eVdlWWpZSnYzVjNacGp2QkNQdDdnQVhFNGdHOE84RWZiVmhZbEIyamlWSncKbjlzQlVkamJGUFB4S3I4MFBBNkM3ZDlvblNRL3A0UVU3UW1ibzY4Y1RtL0lPbndXcEE9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
-    client-key-data: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcEFJQkFBS0NBUUVBNmc4ZnVnYlBuc1FSWDNQS0pxVmlEMG1QT0hFZWxpVjdrcXMvQndKR1JwN2xWVUZ2Ck03UFc1a01xSVpiL3o0VXh6UTRmWm0valBDU0lUY2NxRk80TzJxZDA1cW1PN0UyaG1kUk94VFFrQmd1TzE4dzcKdUdZRk9ML0FOTDBybzNPSVB2KytoT3M0NGtPZzVCNFdaUWRwbzZGOGdYdkJjdDJSRWlVakZXSUNzeE90RWt2WApJdGE5UERac2dpUWI1dWZVZnRFUnlyOFc1cW9DSlB1Vyt3ZzVYV3JmY3ZhTTBHREtsV0s2UnRNMWdodExZYktzCngrM0w3UE1BRWpJR21Bd1BLUnR5MlBEeWRKKzRDdkpqWHJGUndJVlVXMnBoUXVHdEh6c2JNR0RVZEJmZ1lxRnIKbXMwN05MbkhFU2lKeTZ4N2JPZlVsRkZPMy82TjFYZytlNlBDUlFJREFRQUJBb0lCQVFEQXdtWFptWVJoZDQzcgpNM3YzYWRxaFJtNXFDRmN0Um45SG9qcU05aVdVUVlZVE9ZbHdaaHFFbGluYmNmVUpIZU9Pd2FQQWhFTDdKQWNSCkx3WU1LS1laRXpJbVNOd0k1a0pCWXVUZ2FmbUU5UDNWNFVBSnRCTjIwZ3hrSXFzT3VMWXJWQW0rZzgzY0llQWUKSGwxSkpOcXVSTzg1NEFiSUo0c3pDMXlpWG81a2xTdU1mdHBUV3FmTjZLL28rSTA1NE1kbHBrVHh3N1pZc3EwYgpobUVLOXZHSHM1QlJ0OXA0SDJmVjBwWFRUbDN6eHM5aUhjWk00Ny9KL1Qvd2JLTEhHb2Y0bXQ4Y214Ynk0RTkxCnRHZnh0VkRPZy9tQUhvT1ROM29ObFc4Kzg0NU1EMUxMck41dkpjRkVjKzd4N2RONmMyYUxYZHRrdTdCTkNUZkYKNXFNM1c4VTlBb0dCQVBka2Q4M29tZHB6Zis3MlZ0dG1ZY3dlcjVwMTB0TFFadjFPVmdBSmR4MmVkMTNTMmVheAp4S0QyZDNqSERtRnVXeXlwbTk5N1hxeWR4LzJIT3c3bnRTcnd5TDR0Sk9IQVV6MGJhdENsUFNwdGFxcUtjNE5YCkczcXZ6QWl3U2lKWUU4dlg3N0I0bGZGaGZMaVBsWXNTZHNTRHo1UUdEWDVacmlaL2ZIZ1FpVm92QW9HQkFQSXoKNVNvTnVCVXRTditFdTNxRWk3TU42NEYwRUNXbk9INnU3akhLVml4QTdSODgyMUkxazZZZDdaT3dNZk8xVWl0TgpqR3ltZHV0ekJXRGdHZEduc1BaOEx2dGlSZS9ZRzZjc3NvaCtOTTZSVEFCSm1iOHVvZ1BvNllNRHZvR0ErLytvCmFWVGtHOWUvWU0yNXNoOUR3SUN5cHNGZ04rZUk2U3pyVEtuZW5mSExBb0dBRkFXVmpKeWVsd2R4K3kwRXFvMEcKclRadWo5bXBUbFovZjFDdnRTRU8rdDZ3V20rT0l4V1FERmJtSkdnM3licmN0aWlqN05wWE56RXQxbDd6Y0tsZwpDREdralgrcDFIdDBRU1hPNTBQNFIwN0Rxem01VDQvbE1YQzQycHNwNU0yc0RIdFZjcnJQcDlGei9wdmdSbmtnCkU1ZDNYVXVBSEJHMS9uZWk0elN6YVJFQ2dZRUFzbmF1cXpnRXBnWUR0eGQwbFNoSlQ1dzRKZUVCYk4wMGNaUXcKQ3h3T052bDRQNFkyRFBOUllodTNUUldOR1FoSURZUk1ybHBTVWRjazVXYjdYMUp5d0l4c2llcTFvYTdaWVdzNworZnNVcWdqQnVZeUI3eTlMVGhvMnhjVGlnTVlyNlF1TTRYSmJXYk80ZnA0UHM1M1dvSDREQllZQ2EyYWtlZWEvClRJT3VXZFVDZ1lCMHF6U1lWNzQ4ZkRrcmFGb3NSbTB6ZjdCRHUxTGF3UkFTQmd4dHVkekJkTUlqRUdhSXZmaDQKSkFnSU5ITWJIT0JIajFsRDc3UEkzdjVkdVhmS2NzTUpXd1I4UjNod3I5dlBVUDlVRUFOTnVzN3JJcUwwNWFNTAo2TmJ2Zjdmd2JUS1RDZXQ0VU11dElyaXB0UU50d1Voa3JGK1Q3VExrdmN1TlNVeHo5aTlTNkE9PQotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQo=
+    client-certificate-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURJVENDQWdtZ0F3SUJBZ0lJVGovYWthK21Xb1F3RFFZSktvWklodmNOQVFFTEJRQXdGVEVUTUJFR0ExVUUKQXhNS2EzVmlaWEp1WlhSbGN6QWVGdzB5TkRBNU1ERXhORFV5TWpsYUZ3MHlOVEE1TURFeE5EVTNNekJhTURReApGekFWQmdOVkJBb1REbk41YzNSbGJUcHRZWE4wWlhKek1Sa3dGd1lEVlFRREV4QnJkV0psY201bGRHVnpMV0ZrCmJXbHVNSUlCSWpBTkJna3Foa2lHOXcwQkFRRUZBQU9DQVE4QU1JSUJDZ0tDQVFFQStuTzlCMHJHOFFHaGszOW0KdGYyV3ZRMU5CeHhtZ05seC9VMjhHb3RtVm85OXpUSHliQTJRbEduRTN4QlUyTHVGYnZZNm8rN3lVUjZZRWVlaQpQb1hqL0d0RE95cENHWU1vS3VrdU1keXN2b0NyelI1Z21INFA1QXlGTHJ4emd2WVdYSDlnTDN5SlU2aXFCRGhUCkNqN3RZUGRKMVF3c3ZVZTczbm0vWHRQOUtydElYZjljTjR1QUVFeXJucnNxWGlRQmRpQXhrT0xhOXMwemw1RWUKY0k0R0V0c2pzZGdJYTRFeHdjeDV3b0FFWFJTdkpoY3l5ZWdRZzltOGdWTmFUdTlUTThyODFqeWNubGcxMUlTZQoySmZTOVNpbHRrWXVaWFBmUHR0bDByaDVzN3RvZ0tmaFhYNlVUN3h5VXNvOG0rNFozZFdUNUZrZ2NZRHk4MlBKCklPQVZqUUlEQVFBQm8xWXdWREFPQmdOVkhROEJBZjhFQkFNQ0JhQXdFd1lEVlIwbEJBd3dDZ1lJS3dZQkJRVUgKQXdJd0RBWURWUjBUQVFIL0JBSXdBREFmQmdOVkhTTUVHREFXZ0JUVk9iN1lwc281UEgvcTFQTFVoTGN5UlVqZwovekFOQmdrcWhraUc5dzBCQVFzRkFBT0NBUUVBUUdQbkhWeVhaU29LUG82OXdZL3IwU1VkODRrSm8wUkhKZUFrCnhkU0tWeWJOcENuVTlVUEZDd0FGayt5WkpERHR2ZDVnRDlRSEVVS2VqNnhnZGwzQWM2elF1WnJYTXJnS3Z5M0sKbFFsT2I1ZlVhaEVYQW1qMlZjck5YUUFtMmhrbkQzV1hNOFl2azQrL2VneEhrcURHQ3pxcVp5QWUzOVFWQWZQSApTd0lOVGhSM05vOWN6Y0ZoclBnSm8vaUtjLzJsN0llTFhBUEpoSFRveHR0ZWtpTUxTalJDejErZFpVQ0gxVHZTCnlhS2FQaW9venZPT2hNdi80dXFnQWNTQzNsZE1Zd25xTFlLRXNSYXkybWJWcldpL0x0dGlsNS9FRWVYak5NNnEKRDZXWGtCVVNUUUJpYlFpSDdiVE9uZXRoMW40Ym4rU2JyVDRPclFRKzJRbC9VZmlDTnc9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+    client-key-data: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcFFJQkFBS0NBUUVBK25POUIwckc4UUdoazM5bXRmMld2UTFOQnh4bWdObHgvVTI4R290bVZvOTl6VEh5CmJBMlFsR25FM3hCVTJMdUZidlk2bys3eVVSNllFZWVpUG9Yai9HdERPeXBDR1lNb0t1a3VNZHlzdm9DcnpSNWcKbUg0UDVBeUZMcnh6Z3ZZV1hIOWdMM3lKVTZpcUJEaFRDajd0WVBkSjFRd3N2VWU3M25tL1h0UDlLcnRJWGY5YwpONHVBRUV5cm5yc3FYaVFCZGlBeGtPTGE5czB6bDVFZWNJNEdFdHNqc2RnSWE0RXh3Y3g1d29BRVhSU3ZKaGN5CnllZ1FnOW04Z1ZOYVR1OVRNOHI4MWp5Y25sZzExSVNlMkpmUzlTaWx0a1l1WlhQZlB0dGwwcmg1czd0b2dLZmgKWFg2VVQ3eHlVc284bSs0WjNkV1Q1RmtnY1lEeTgyUEpJT0FWalFJREFRQUJBb0lCQUNGN0FXVU5LUVVrMjYyMQpGVXowNW9iRlZXdkM3eTBBWkkyaEs2azh3MlNFOENOVEx2NGszaFFKQTZseUxIV0FzL2krYjk1a1hmNWNJYVliCkdnUlRyOE9acnpZa2t3dUlEZ0dXaEhkajhhL1IwYVd0RHVxengzb0w5bTNtQVdjYmNLZlMyMC9kelJuaTdUOTkKTEJTdGp0d3NrckVwWEgyOUxpOHloVk91OFNRWis0SFBJRUg2VExaVDI0Y3Z6NTg0ampGRXE0WWlnR2hCV3RQMwpiL0YyMkJkcnVhSUwxMnh3Tk84UXU3d1ZReDJ3cW40dzhOYlRQZG5MdG5LbkppY3JlU05WN1NDZGU0SHp0Tm1ZCkwrSVdWWXRPWUtsTHBqdmE0N0MvYkJmK1pmUkhoeTZpTWdXMHQxcytyaUlLcGVmcEkzais0Zi9NWUlXazBKTFMKQllMbnFyMENnWUVBK3U0dzZseXh1emZNOU91NUV1NmNYcTZnVE1lNFYreW56T0VhK0FMa2gyUnBLZ1dNcFVVdwp3alR3VTJlSS9oY2pYd2xxVjdlSzdyU1JUQ0d4bW9QUW1abktGTWVyNGFpR1pjbHhLV216WjF1YklvSWg4UlJHCkhVamZzKzhxM0daSDFHL3dzN1BnV1Y5S0daRmxBWmp5QXRCMDVKVVNRMlZHMGJuby85SFlOTk1DZ1lFQS80TVMKeWhGNS9sVklXRi9kdnpmamxKVlZDSTZxZ3JtdUY0UWJaT2VMNzlDcTdKNUJPKzE5eG1LbGJRUUJUZVRTQXpWRQpJUURGVC9LWURyVlJYcGpYdGQzd2FhSXl3UDhFaTRxMXJTMTltcjRyRWVXQUY5QUZXKzhOL2RJUW8rcHdTczRVCi9HWmNQNnlSQzlyL3VHakpqb2ZVZkVWY0wxeHRZRU44SHUwNWtCOENnWUVBN24yVVlDclpnV2IzbFpDMHhobWkKNVJwem9JWHgzeDgrSEt1V1JrSDVrZlVOUHJNbmlhekpPc3UxM285NDFJYUpSN3BiS0NONkdJWGwwc1h6VnpnUQordXYvOU9BUnJOZlBaTTZnand1M1IzVDViVUxobjQvMVU3Ly9YYlRpdDdjK2JkbzJtNVZLbGFiTGRxR0pyb3IrCitVM0d5N29qTVlzQVZEU3VEdllTMTZFQ2dZRUFudDZ6MXhxSXZOL3dES3NHNkxkcWROOXBNTm5zSVQ0c2hnaXAKTTlOWXlqTDNwQW8rUzNHK2E1UzRnUkVsY25aZE1vdHpJZ1lscVRFUTVNeE9uTC95RisyNFp5WG40dUp0eEFucQpMcFNEYmF6aWdNMHZHUjlKeGNEYzlUNGhCSnBuV2N2TGRxaDZvVWkrSXgzM05JVkxGYWxWTURPOFB1SjhTNGVLCmJIeFo5MGNDZ1lFQTVxa2JrZjhITjNNaHB3UkJTMDdwTVZlODJRRXFXc1NzREFBTXlzMzZvUG0yQVRoUkpVTVEKWjI1UWZLcHVxWDBQNnJvNHZ2RURpNWJkTHpWRFhpLzVOV20rM25pbUU5SHBtempOVXpFSzhlaTJ1MmNVOGhrTwp6OW40Mm13SlJ4clk1cDJ2WmxEREhSd2xrVFR4d2JhMXB3VGtlbEFiMVpSVlNKZjNhKzM0Y3BRPQotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQo=
 ```
+</details>
+
+<details><summary>sudo kubectl get pods --all-namespaces </summary>
+
 ```shell
-   ubuntu@master:~$ sudo kubectl get pods --all-namespaces
-NAMESPACE     NAME                                      READY   STATUS    RESTARTS      AGE
-kube-system   calico-kube-controllers-648dffd99-tzj4f   1/1     Running   0             33m
-kube-system   calico-node-5zjvg                         1/1     Running   0             35m
-kube-system   calico-node-6smt7                         1/1     Running   0             35m
-kube-system   calico-node-ztjq2                         1/1     Running   0             35m
-kube-system   coredns-77f7cc69db-9bw9v                  1/1     Running   0             33m
-kube-system   coredns-77f7cc69db-hczpk                  1/1     Running   0             33m
-kube-system   dns-autoscaler-8576bb9f5b-prdj7           1/1     Running   0             33m
-kube-system   kube-apiserver-master                     1/1     Running   1             36m
-kube-system   kube-controller-manager-master            1/1     Running   2             36m
-kube-system   kube-proxy-6km96                          1/1     Running   0             35m
-kube-system   kube-proxy-bgphh                          1/1     Running   0             35m
-kube-system   kube-proxy-w6j7b                          1/1     Running   0             35m
-kube-system   kube-scheduler-master                     1/1     Running   2 (32m ago)   36m
-kube-system   nginx-proxy-node1                         1/1     Running   0             35m
-kube-system   nginx-proxy-node2                         1/1     Running   0             35m
-kube-system   nodelocaldns-8rqpp                        1/1     Running   0             33m
-kube-system   nodelocaldns-dr6wr                        1/1     Running   0             33m
-kube-system   nodelocaldns-lffhr                        1/1     Running   0             33m
+ubuntu@node0:~$ sudo kubectl get pods --all-namespaces
+NAMESPACE     NAME                                                READY   STATUS    RESTARTS   AGE
+argocd        argocd-application-controller-0                     1/1     Running   0          22m
+argocd        argocd-applicationset-controller-568754c579-st6t6   1/1     Running   0          22m
+argocd        argocd-dex-server-7658dcdf77-qjt7k                  1/1     Running   0          22m
+argocd        argocd-notifications-controller-5548b96954-flc8w    1/1     Running   0          22m
+argocd        argocd-redis-6976fc7dfc-bbxx5                       1/1     Running   0          22m
+argocd        argocd-repo-server-7594f8849c-dztdz                 1/1     Running   0          22m
+argocd        argocd-server-58cc545d87-xb7gm                      1/1     Running   0          22m
+kube-system   calico-kube-controllers-648dffd99-v5hl4             1/1     Running   0          23m
+kube-system   calico-node-bm4cc                                   1/1     Running   0          24m
+kube-system   calico-node-bm5qt                                   1/1     Running   0          24m
+kube-system   calico-node-wtph5                                   1/1     Running   0          24m
+kube-system   coredns-77f7cc69db-4gj8x                            1/1     Running   0          23m
+kube-system   coredns-77f7cc69db-8xrf2                            1/1     Running   0          23m
+kube-system   dns-autoscaler-8576bb9f5b-9j6ds                     1/1     Running   0          23m
+kube-system   kube-apiserver-node0                                1/1     Running   1          25m
+kube-system   kube-controller-manager-node0                       1/1     Running   2          25m
+kube-system   kube-proxy-4rpcv                                    1/1     Running   0          24m
+kube-system   kube-proxy-5v8v8                                    1/1     Running   0          24m
+kube-system   kube-proxy-jjc5q                                    1/1     Running   0          24m
+kube-system   kube-scheduler-node0                                1/1     Running   1          25m
+kube-system   nginx-proxy-node1                                   1/1     Running   0          24m
+kube-system   nginx-proxy-node2                                   1/1     Running   0          24m
+kube-system   nodelocaldns-4hd6l                                  1/1     Running   0          23m
+kube-system   nodelocaldns-8j756                                  1/1     Running   0          23m
+kube-system   nodelocaldns-tz8xk                                  1/1     Running   0          23m
+```
+</details>
 
-ubuntu@master:~$ sudo kubectl get nodes 
-NAME     STATUS   ROLES           AGE   VERSION
-master   Ready    control-plane   46m   v1.28.6
-node1    Ready    <none>          45m   v1.28.6
-node2    Ready    <none>          45m   v1.28.6
+<details><summary>sudo kubectl get nodes </summary>
+
+```shell
+ubuntu@node0:~$ sudo kubectl get nodes
+NAME    STATUS   ROLES           AGE   VERSION
+node0   Ready    control-plane   25m   v1.28.6
+node1   Ready    <none>          25m   v1.28.6
+node2   Ready    <none>          25m   v1.28.6
 
 ```
-<details><summary>Прошу прощения, дальше пока не сделал </summary>
+</details>
 
 ### Создание тестового приложения
 
