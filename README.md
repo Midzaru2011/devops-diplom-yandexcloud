@@ -356,6 +356,8 @@ node2   Ready    <none>          25m   v1.28.6
 
 ![DockerHub](IMG/DockerHub.PNG)
 
+docker pull midzaru2011/myapp:1.0.1
+
 
 ## Подготовка cистемы мониторинга и деплой приложения
 
@@ -611,8 +613,308 @@ Update Complete. ⎈Happy Helming!⎈
 ![Docker](<IMG/DockerHub token.PNG>)
 ![alt text](IMG/DockerHub1.PNG)
 
-4. Для настроки CI pipeline используется [Jenkinsfile](https://github.com/Midzaru2011/myapp/blob/main/Jenkinsfile), который расположен в репозитории с кодом приложения. Создал джоб, который использует этот файл для автоматической сборки и отправки собранного образа в DockerHub по коммиту в репозиторий и указанному тэгу:
+4. Для настроки CI pipeline используется [Jenkinsfile](https://github.com/Midzaru2011/myapp/blob/main/Jenkinsfile), который расположен в репозитории с кодом приложения. Создал джоб, который использует этот файл для автоматической сборки и отправки собранного образа в DockerHub по коммиту в репозиторий и указанному тэгу.
 
+5. Для того чтобы происходил автоматический деплой приложения в кластер k8s, при разворачивании через kubespray, в файле конфигураций [addons.yml](https://github.com/Midzaru2011/devops-diplom-yandexcloud/blob/main/kubespray/inventory/mycluster/group_vars/k8s_cluster/addons.yml) включил установку ArgoCD:
+
+![alt text](IMG/ArgoCD.PNG)
+
+6. Подключил репозиторий с конфигруационными файлами для моего приложения:
+
+![alt text](IMG/ArgoCD1.PNG)
+
+7. Создал application из файла [application](https://github.com/Midzaru2011/myapp/blob/main/application/app2.yaml):
+
+![alt text](IMG/ArgoCD2.PNG)
+
+![alt text](IMG/ArgoCD3.PNG)
+
+![alt text](IMG/ArgoCD4.PNG)
+
+8. Теперь, при любом коммите в ветку main репозитория с кодом приложения, происходит автоматическая сборка, отправка докер образа в DockerHub, и установка приложения с помощью helm charts через ArgoCD в созданный cluster:
+
+```shell
+zag1988@compute-vm-4-4-70-hdd-1725199716918:~/myapp$ git tag -a 1.0.3 -m "version 1.0.3"
+
+zag1988@compute-vm-4-4-70-hdd-1725199716918:~/myapp$ git push origin --tags
+Enumerating objects: 1, done.
+Counting objects: 100% (1/1), done.
+Writing objects: 100% (1/1), 161 bytes | 161.00 KiB/s, done.
+Total 1 (delta 0), reused 0 (delta 0), pack-reused 0
+To https://github.com/Midzaru2011/myapp.git
+ * [new tag]         1.0.3 -> 1.0.3
+
+zag1988@compute-vm-4-4-70-hdd-1725199716918:~/myapp$ git status
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   index.html
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+zag1988@compute-vm-4-4-70-hdd-1725199716918:~/myapp$ git add index.html 
+
+zag1988@compute-vm-4-4-70-hdd-1725199716918:~/myapp$ git commit -m 'add version 1.0.3'
+[main 7223c7c] add version 1.0.3
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+zag1988@compute-vm-4-4-70-hdd-1725199716918:~/myapp$ git push
+Enumerating objects: 5, done.
+Counting objects: 100% (5/5), done.
+Delta compression using up to 4 threads
+Compressing objects: 100% (3/3), done.
+Writing objects: 100% (3/3), 335 bytes | 335.00 KiB/s, done.
+Total 3 (delta 2), reused 0 (delta 0), pack-reused 0
+remote: Resolving deltas: 100% (2/2), completed with 2 local objects.
+To https://github.com/Midzaru2011/myapp.git
+   28d41a6..7223c7c  main -> main 
+
+zag1988@compute-vm-4-4-70-hdd-1725199716918:~/myapp$ git log -1 --stat
+commit d24ab150a66be8320b949eb7a764cd00f1fcc3a4 (HEAD -> main, origin/main, origin/HEAD)
+Author: Midzaru2011 <midzaru2011@yandex.ru>
+Date:   Sun Sep 1 20:36:28 2024 +0000
+
+            modified:   index.html
+
+ index.html | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+```
+
+job jenkins запускается относительно последнего коммита в main ветку, происходит сборка docker image c указанным тэгом, его отправка в dockerhub и с помощью установленного ArgoCD, приложение устанавливается в кластер. 
+
+<details><summary>Jenkins job</summary>
+
+```shell
+Started by GitHub push by Midzaru2011
+Obtained Jenkinsfile from git https://github.com/Midzaru2011/myapp.git
+[Pipeline] Start of Pipeline
+[Pipeline] node
+Running on Jenkins in /var/lib/jenkins/workspace/Myapp
+[Pipeline] {
+[Pipeline] stage
+[Pipeline] { (Declarative: Checkout SCM)
+[Pipeline] checkout
+Selected Git installation does not exist. Using Default
+The recommended git tool is: NONE
+using credential GitHub
+ > git rev-parse --resolve-git-dir /var/lib/jenkins/workspace/Myapp/.git # timeout=10
+Fetching changes from the remote Git repository
+ > git config remote.origin.url https://github.com/Midzaru2011/myapp.git # timeout=10
+Fetching upstream changes from https://github.com/Midzaru2011/myapp.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.25.1'
+using GIT_ASKPASS to set credentials 
+ > git fetch --tags --force --progress -- https://github.com/Midzaru2011/myapp.git +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git rev-parse refs/remotes/origin/main^{commit} # timeout=10
+Checking out Revision d24ab150a66be8320b949eb7a764cd00f1fcc3a4 (refs/remotes/origin/main)
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f d24ab150a66be8320b949eb7a764cd00f1fcc3a4 # timeout=10
+Commit message: "	modified:   index.html"
+ > git rev-list --no-walk 925dba1e2a4965dadffcd0413c9b8159d6386a91 # timeout=10
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] withEnv
+[Pipeline] {
+[Pipeline] withEnv
+[Pipeline] {
+[Pipeline] stage
+[Pipeline] { (Delete workspace)
+[Pipeline] echo
+Deleting workspace
+[Pipeline] deleteDir
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Checkout branch)
+[Pipeline] git
+Selected Git installation does not exist. Using Default
+The recommended git tool is: NONE
+No credentials specified
+Cloning the remote Git repository
+Cloning repository https://github.com/Midzaru2011/myapp.git
+ > git init /var/lib/jenkins/workspace/Myapp # timeout=10
+Fetching upstream changes from https://github.com/Midzaru2011/myapp.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.25.1'
+ > git fetch --tags --force --progress -- https://github.com/Midzaru2011/myapp.git +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git config remote.origin.url https://github.com/Midzaru2011/myapp.git # timeout=10
+ > git config --add remote.origin.fetch +refs/heads/*:refs/remotes/origin/* # timeout=10
+Avoid second fetch
+ > git rev-parse refs/remotes/origin/main^{commit} # timeout=10
+Checking out Revision d24ab150a66be8320b949eb7a764cd00f1fcc3a4 (refs/remotes/origin/main)
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f d24ab150a66be8320b949eb7a764cd00f1fcc3a4 # timeout=10
+ > git branch -a -v --no-abbrev # timeout=10
+ > git checkout -b main d24ab150a66be8320b949eb7a764cd00f1fcc3a4 # timeout=10
+Commit message: "	modified:   index.html"
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Checkout tag)
+[Pipeline] script
+[Pipeline] {
+[Pipeline] sh
++ git fetch
+[Pipeline] sh
++ git tag --sort=-creatordate
++ head -n 1
+[Pipeline] echo
+gitTag output: 1.0.3
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Build docker image)
+[Pipeline] script
+[Pipeline] {
+[Pipeline] isUnix
+[Pipeline] withEnv
+[Pipeline] {
+[Pipeline] sh
++ docker build -t midzaru2011/myapp .
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+Sending build context to Docker daemon  146.9kB
+
+Step 1/3 : FROM nginx:latest
+ ---> 5ef79149e0ec
+Step 2/3 : WORKDIR /usr/share/nginx/html
+ ---> Using cache
+ ---> 58d889d54eab
+Step 3/3 : COPY index.html /usr/share/nginx/html/
+ ---> Using cache
+ ---> bc3282710a41
+Successfully built bc3282710a41
+Successfully tagged midzaru2011/myapp:latest
+[Pipeline] }
+[Pipeline] // withEnv
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Push docker image:tag)
+[Pipeline] script
+[Pipeline] {
+[Pipeline] withEnv
+[Pipeline] {
+[Pipeline] withDockerRegistry
+$ docker login -u midzaru2011 -p ******** https://index.docker.io/v1/
+WARNING! Using --password via the CLI is insecure. Use --password-stdin.
+WARNING! Your password will be stored unencrypted in /var/lib/jenkins/workspace/Myapp@tmp/4db5966c-267a-4833-84c5-76f67aa59149/config.json.
+Configure a credential helper to remove this warning. See
+https://docs.docker.com/engine/reference/commandline/login/#credentials-store
+
+Login Succeeded
+[Pipeline] {
+[Pipeline] isUnix
+[Pipeline] withEnv
+[Pipeline] {
+[Pipeline] sh
++ docker tag midzaru2011/myapp index.docker.io/midzaru2011/myapp:1.0.3
+[Pipeline] }
+[Pipeline] // withEnv
+[Pipeline] isUnix
+[Pipeline] withEnv
+[Pipeline] {
+[Pipeline] sh
++ docker push index.docker.io/midzaru2011/myapp:1.0.3
+The push refers to repository [docker.io/midzaru2011/myapp]
+3f05e223187d: Preparing
+5f0272c6e96d: Preparing
+f4f00eaedec7: Preparing
+55e54df86207: Preparing
+ec1a2ca4ac87: Preparing
+8b87c0c66524: Preparing
+72db5db515fd: Preparing
+9853575bc4f9: Preparing
+8b87c0c66524: Waiting
+72db5db515fd: Waiting
+9853575bc4f9: Waiting
+5f0272c6e96d: Layer already exists
+55e54df86207: Layer already exists
+3f05e223187d: Layer already exists
+ec1a2ca4ac87: Layer already exists
+f4f00eaedec7: Layer already exists
+8b87c0c66524: Layer already exists
+72db5db515fd: Layer already exists
+9853575bc4f9: Layer already exists
+1.0.3: digest: sha256:de44783ebedb5ebc23e5f3ca9b9b113e91ce0beb3ad249b17ae56bac6f2a410f size: 1985
+[Pipeline] }
+[Pipeline] // withEnv
+[Pipeline] }
+[Pipeline] // withDockerRegistry
+[Pipeline] }
+[Pipeline] // withEnv
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Update tag)
+[Pipeline] script
+[Pipeline] {
+[Pipeline] sh
++ sed -i s|tag:.*|tag: 1.0.3|g /var/lib/jenkins/workspace/Myapp/k8s/MyChart1/values.yaml
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Push the changed deployment file to Git)
+[Pipeline] sh
++ git config --global user.name Midzaru2011
++ git add /var/lib/jenkins/workspace/Myapp/k8s/MyChart1/values.yaml
++ git commit -m Updated Deployment
+[main 7cc3a0e] Updated Deployment
+ Committer: Midzaru2011 <jenkins@jenkins.ru-central1.internal>
+Your name and email address were configured automatically based
+on your username and hostname. Please check that they are accurate.
+You can suppress this message by setting them explicitly:
+
+    git config --global user.name "Your Name"
+    git config --global user.email you@example.com
+
+After doing this, you may fix the identity used for this commit with:
+
+    git commit --amend --reset-author
+
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+[Pipeline] withCredentials
+ > git --version # timeout=10
+ > git --version # 'git version 2.25.1'
+Masking supported pattern matches of $GIT_PASSWORD or $GIT_ASKPASS
+[Pipeline] {
+[Pipeline] sh
++ git push https://github.com/Midzaru2011/myapp.git main
+To https://github.com/Midzaru2011/myapp.git
+   d24ab15..7cc3a0e  main -> main
+[Pipeline] }
+[Pipeline] // withCredentials
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] }
+[Pipeline] // withEnv
+[Pipeline] }
+[Pipeline] // withEnv
+[Pipeline] }
+[Pipeline] // node
+[Pipeline] End of Pipeline
+Finished: SUCCESS
+```
+</details>
+
+![alt text](<IMG/DockerHub v1.0.3.PNG>)
+
+![alt text](IMG/ArgoCD5.PNG)
+
+![alt text](IMG/Deployment3.PNG)
 
 
 ## Что необходимо для сдачи задания?
