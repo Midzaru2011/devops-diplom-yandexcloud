@@ -75,7 +75,7 @@ zag1988@mytest6:~/devops-diplom-yandexcloud/terraform2$ yc iam service-account l
 
 ```shell
 zag1988@mytest6:~/devops-diplom-yandexcloud/terraform2$ terraform --version
-Terraform v1.4.7
+Terraform v1.4.6
 on linux_amd64
 + provider registry.terraform.io/hashicorp/local v2.5.1
 + provider registry.terraform.io/yandex-cloud/yandex v0.116.0
