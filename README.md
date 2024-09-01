@@ -569,7 +569,9 @@ Update Complete. ⎈Happy Helming!⎈
 ![Node-1](IMG/Deployment.PNG)
 ![Node-2](IMG/Deployment1.PNG)
 
-### Установка и настройка CI/CD
+## Установка и настройка CI/CD
+
+<details><summary>Задание №5</summary>
 
 Осталось настроить ci/cd систему для автоматической сборки docker image и деплоя приложения при изменении кода.
 
@@ -589,6 +591,29 @@ Update Complete. ⎈Happy Helming!⎈
 </details>
 
 ---
+
+## Решение
+
+Для выполнения этого задания использую развернутый через Terraform сервер Jenkins (CI), а для настройки CD установленный в кластер Kubernetes ArgoCD.
+
+1. Для автоматической сборки Docker Image моего приложения по коммиту в ремозиторий с файлами приложения, необходимо настроить webhook. Для этого, необходимо в настройках репозитория прописать адрес, по которому будет работь Jenkins сервер:
+
+![Webhook](IMG/Webhook.PNG)
+![Webhook](IMG/Webhook2.PNG)
+![alt text](IMG/Webhook3.PNG)
+
+2. В jenkins необходимо настроить подключение к репозиторию GitHub, в котором будет располагаться код приложения, для этого нужно создать Global Credantional для GitHub:
+
+![GitHub](IMG/GitHub.PNG)
+
+3. Для того, чтобы jenkins мог отправлять собранный Docker Image в DockerHub, также необходимо создать Global Credantional для DockerHub, используя сгенерируемый в DockerHub токен:
+
+![Docker](<IMG/DockerHub token.PNG>)
+![alt text](IMG/DockerHub1.PNG)
+
+4. Для настроки CI pipeline используется [Jenkinsfile](https://github.com/Midzaru2011/myapp/blob/main/Jenkinsfile), который расположен в репозитории с кодом приложения. Создал джоб, который использует этот файл для автоматической сборки и отправки собранного образа в DockerHub по коммиту в репозиторий и указанному тэгу:
+
+
 
 ## Что необходимо для сдачи задания?
 
