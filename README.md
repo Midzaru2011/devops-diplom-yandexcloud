@@ -539,10 +539,10 @@ prom-operator
 ubuntu@node0:~$ kubectl create namespace myapp 
 namespace/myapp created
 
-ubuntu@node0:~$ helm repo add sasha https://midzaru2011.github.io/helm/
+ubuntu@node0:~$ helm repo add sasha https://midzaru2011.github.io/myapp/
 "sasha" has been added to your repositories
 
-ubuntu@node0:~$ helm install myapp1 sasha/my-app --namespace myapp 
+ubuntu@node0:~$ helm install myapp1 sasha1/my-app --namespace myapp 
 NAME: myapp1
 LAST DEPLOYED: Sun Sep  1 18:05:18 2024
 NAMESPACE: myapp
@@ -559,12 +559,15 @@ Deployed version 0.1.0.
 
 ubuntu@node0:~$ helm repo update
 Hang tight while we grab the latest from your chart repositories...
-...Successfully got an update from the "sasha" chart repository
+...Successfully got an update from the "sasha1" chart repository
 ...Successfully got an update from the "prometheus-community" chart repository
 Update Complete. ⎈Happy Helming!⎈
 
 ```
-11. 
+11. Теперь приложение доступно по порту, указанному в файле переменных [values.yaml](https://github.com/Midzaru2011/myapp/blob/main/k8s/MyChart1/values.yaml) на каждой рабочей ноде кластера:
+
+![Node-1](IMG/Deployment.PNG)
+![Node-2](IMG/Deployment1.PNG)
 
 ### Установка и настройка CI/CD
 
