@@ -91,10 +91,10 @@ is 1.8.1. You can update by downloading from https://www.terraform.io/downloads.
    В данной конфигурации создаются:
    * _VPC c подсетями разных зонах доступности:_
 
-   ![VPC](IMG/VPC.PNG)
+![VPC](IMG/VPC.PNG)
    * _Создается bucket, куда отправляется файл terraform.tfstate, который используется в качестве backend:_
 
-   ![Bucket](<IMG/bucket for backend.PNG>)
+![Bucket](<IMG/bucket for backend.PNG>)
 
 4. Также были созданы четыре виртуальные машины, которые будут использованы в дальнейшем для установки кластера k8s и jenkins:
 
@@ -148,10 +148,11 @@ zag1988@compute-vm-4-4-70-hdd-1725199716918:~$ yc compute instance list
    * Для того, чтобы кластер k8s был доступен из интернета, в конфигах изменил параметр supplementary_addresses_in_ssl_keys [supplementary_addresses_in_ssl_keys](kubespray/mycluster/group_vars/k8s_cluster/k8s-cluster.yml) на EXTERNAL IP  node-0, которая будет выступать мастер нодой;  
    * Запустил playbook для установки кластера k8s: **ansible-playbook -i inventory/mycluster/hosts.yaml  --become --become-user=root cluster.yml**;
    * Playbook успешно завершился:
-      ![PLAY RECAP](<IMG/kuberspray.PNG>)
+
+![PLAY RECAP](<IMG/kuberspray.PNG>)
    * Проверил, что кластер доступен по внешнему адресу, который задавали в конфигах:
 
-      ![alt text](<IMG/external IP.PNG>)
+![alt text](<IMG/external IP.PNG>)
    * заходим на мастер ноду кластера, и проверяем доступность конфигурационных файлов и созданных pods:
 
 <details><summary>cat ~/.kube/config </summary>
@@ -351,8 +352,14 @@ node2   Ready    <none>          25m   v1.28.6
    1.0.1: digest: sha256:03f83431b23322f39f87fceec32c4594507c1298687a85e15203e41e2af80684 size: 2191
    ```
       </details>
+6. Проверил, что докер образ успешно был создан в docker registry:
 
-### Подготовка cистемы мониторинга и деплой приложения
+![DockerHub](IMG/DockerHub.PNG)
+
+
+## Подготовка cистемы мониторинга и деплой приложения
+
+<details><summary>Задание №4</summary>
 
 Уже должны быть готовы конфигурации для автоматического создания облачной инфраструктуры и поднятия Kubernetes кластера.  
 Теперь необходимо подготовить конфигурационные файлы для настройки нашего Kubernetes кластера.
@@ -368,6 +375,8 @@ node2   Ready    <none>          25m   v1.28.6
 2. Для организации конфигурации использовать [qbec](https://qbec.io/), основанный на [jsonnet](https://jsonnet.org/). Обратите внимание на имеющиеся функции для интеграции helm конфигов и [helm charts](https://helm.sh/)
 3. Если на первом этапе вы не воспользовались [Terraform Cloud](https://app.terraform.io/), то задеплойте и настройте в кластере [atlantis](https://www.runatlantis.io/) для отслеживания изменений инфраструктуры. Альтернативный вариант 3 задания: вместо Terraform Cloud или atlantis настройте на автоматический запуск и применение конфигурации terraform из вашего git-репозитория в выбранной вами CI-CD системе при любом комите в main ветку. Предоставьте скриншоты работы пайплайна из CI/CD системы.
 
+</details>
+
 Ожидаемый результат:
 
 1. Git репозиторий с конфигурационными файлами для настройки Kubernetes.
@@ -376,6 +385,186 @@ node2   Ready    <none>          25m   v1.28.6
 4. Http доступ к тестовому приложению.
 
 ---
+
+## Решение
+
+Для настройки систмемы мониторинга, воспользовался Helm Charts [Prometheus Community](https://prometheus-community.github.io/helm-charts), пердварительно настроив Kubernetes кластер.
+
+1. Создал новое пространство имен для мониоринга:
+   
+```shell
+ubuntu@node0:~$ kubectl create ns monitoring
+namespace/monitoring created
+```
+2. Добавил репозиторий чартов для системы мониторинга:
+
+```shell
+ubuntu@node0:~$ helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+"prometheus-community" has been added to your repositories
+ubuntu@node0:~$ helm repo list
+NAME                    URL                                               
+prometheus-community    https://prometheus-community.github.io/helm-charts
+```
+
+3. Проверил доступные charts:
+
+   <details><summary>helm search repo prometheus-community</summary>
+
+   ```shell
+   ubuntu@node0:~$ helm search repo prometheus-community
+   NAME                                                    CHART VERSION   APP VERSION     DESCRIPTION                                       
+   prometheus-community/alertmanager                       1.12.0          v0.27.0         The Alertmanager handles alerts sent by client ...
+   prometheus-community/alertmanager-snmp-notifier         0.3.0           v1.5.0          The SNMP Notifier handles alerts coming from Pr...
+   prometheus-community/jiralert                           1.7.1           v1.3.0          A Helm chart for Kubernetes to install jiralert   
+   prometheus-community/kube-prometheus-stack              62.3.1          v0.76.0         kube-prometheus-stack collects Kubernetes manif...
+   prometheus-community/kube-state-metrics                 5.25.1          2.13.0          Install kube-state-metrics to generate and expo...
+   prometheus-community/prom-label-proxy                   0.10.0          v0.11.0         A proxy that enforces a given label in a given ...
+   prometheus-community/prometheus                         25.27.0         v2.54.1         Prometheus is a monitoring system and time seri...
+   prometheus-community/prometheus-adapter                 4.11.0          v0.12.0         A Helm chart for k8s prometheus adapter           
+   prometheus-community/prometheus-blackbox-exporter       9.0.0           v0.25.0         Prometheus Blackbox Exporter                      
+   prometheus-community/prometheus-cloudwatch-expo...      0.25.3          0.15.5          A Helm chart for prometheus cloudwatch-exporter   
+   prometheus-community/prometheus-conntrack-stats...      0.5.10          v0.4.18         A Helm chart for conntrack-stats-exporter         
+   prometheus-community/prometheus-consul-exporter         1.0.0           0.4.0           A Helm chart for the Prometheus Consul Exporter   
+   prometheus-community/prometheus-couchdb-exporter        1.0.0           1.0             A Helm chart to export the metrics from couchdb...
+   prometheus-community/prometheus-druid-exporter          1.1.0           v0.11.0         Druid exporter to monitor druid metrics with Pr...
+   prometheus-community/prometheus-elasticsearch-e...      6.4.0           v1.7.0          Elasticsearch stats exporter for Prometheus       
+   prometheus-community/prometheus-fastly-exporter         0.4.0           v8.1.0          A Helm chart for the Prometheus Fastly Exporter   
+   prometheus-community/prometheus-ipmi-exporter           0.4.0           v1.8.0          This is an IPMI exporter for Prometheus.          
+   prometheus-community/prometheus-json-exporter           0.13.0          v0.6.0          Install prometheus-json-exporter                  
+   prometheus-community/prometheus-kafka-exporter          2.10.0          v1.7.0          A Helm chart to export the metrics from Kafka i...
+   prometheus-community/prometheus-memcached-exporter      0.3.4           v0.14.4         Prometheus exporter for Memcached metrics         
+   prometheus-community/prometheus-modbus-exporter         0.1.2           0.4.1           A Helm chart for prometheus-modbus-exporter       
+   prometheus-community/prometheus-mongodb-exporter        3.6.0           0.40.0          A Prometheus exporter for MongoDB metrics         
+   prometheus-community/prometheus-mysql-exporter          2.6.1           v0.15.1         A Helm chart for prometheus mysql exporter with...
+   prometheus-community/prometheus-nats-exporter           2.17.0          0.15.0          A Helm chart for prometheus-nats-exporter         
+   prometheus-community/prometheus-nginx-exporter          0.2.1           0.11.0          A Helm chart for the Prometheus NGINX Exporter    
+   prometheus-community/prometheus-node-exporter           4.39.0          1.8.2           A Helm chart for prometheus node-exporter         
+   prometheus-community/prometheus-opencost-exporter       0.1.1           1.108.0         Prometheus OpenCost Exporter                      
+   prometheus-community/prometheus-operator                9.3.2           0.38.1          DEPRECATED - This chart will be renamed. See ht...
+   prometheus-community/prometheus-operator-admiss...      0.15.0          0.76.0          Prometheus Operator Admission Webhook             
+   prometheus-community/prometheus-operator-crds           14.0.0          v0.76.0         A Helm chart that collects custom resource defi...
+   prometheus-community/prometheus-pgbouncer-exporter      0.3.0           v0.8.0          A Helm chart for prometheus pgbouncer-exporter    
+   prometheus-community/prometheus-pingdom-exporter        2.5.0           20190610-1      A Helm chart for Prometheus Pingdom Exporter      
+   prometheus-community/prometheus-pingmesh-exporter       0.4.0           v1.2.1          Prometheus Pingmesh Exporter                      
+   prometheus-community/prometheus-postgres-exporter       6.3.1           v0.15.0         A Helm chart for prometheus postgres-exporter     
+   prometheus-community/prometheus-pushgateway             2.14.0          v1.9.0          A Helm chart for prometheus pushgateway           
+   prometheus-community/prometheus-rabbitmq-exporter       1.12.1          v0.29.0         Rabbitmq metrics exporter for prometheus          
+   prometheus-community/prometheus-redis-exporter          6.5.0           v1.62.0         Prometheus exporter for Redis metrics             
+   prometheus-community/prometheus-smartctl-exporter       0.10.0          v0.12.0         A Helm chart for Kubernetes                       
+   prometheus-community/prometheus-snmp-exporter           5.5.0           v0.26.0         Prometheus SNMP Exporter                          
+   prometheus-community/prometheus-sql-exporter            0.1.0           v0.5.4          Prometheus SQL Exporter                           
+   prometheus-community/prometheus-stackdriver-exp...      4.6.0           v0.16.0         Stackdriver exporter for Prometheus               
+   prometheus-community/prometheus-statsd-exporter         0.14.0          v0.27.1         A Helm chart for prometheus stats-exporter        
+   prometheus-community/prometheus-systemd-exporter        0.3.0           0.6.0           A Helm chart for prometheus systemd-exporter      
+   prometheus-community/prometheus-to-sd                   0.4.2           0.5.2           Scrape metrics stored in prometheus format and ...
+   prometheus-community/prometheus-windows-exporter        0.5.2           0.27.2          A Helm chart for prometheus windows-exporter   
+   ```
+   </details>
+
+4. Запустил установку  prometheus и всех зависимостей через helm в созданном namespace:
+
+```shell
+ubuntu@node0:~$ helm install stable prometheus-community/kube-prometheus-stack --namespace=monitoring
+NAME: stable
+LAST DEPLOYED: Sun Sep  1 17:01:16 2024
+NAMESPACE: monitoring
+STATUS: deployed
+REVISION: 1
+NOTES:
+kube-prometheus-stack has been installed. Check its status by running:
+  kubectl --namespace monitoring get pods -l "release=stable"
+
+Visit https://github.com/prometheus-operator/kube-prometheus for instructions on how to create & configure Alertmanager and Prometheus instances using the Operator.
+```
+5. Проверил работу Pods и svc  в namespace monitoring:
+
+```shell
+ubuntu@node0:~$ kubectl --namespace monitoring get pods
+NAME                                                     READY   STATUS    RESTARTS   AGE
+alertmanager-stable-kube-prometheus-sta-alertmanager-0   2/2     Running   0          38m
+prometheus-stable-kube-prometheus-sta-prometheus-0       2/2     Running   0          38m
+stable-grafana-5448785bb6-dgznw                          3/3     Running   0          38m
+stable-kube-prometheus-sta-operator-744c468ccd-qmqcz     1/1     Running   0          38m
+stable-kube-state-metrics-784c9bff7d-d2fw4               1/1     Running   0          38m
+stable-prometheus-node-exporter-bw82g                    1/1     Running   0          38m
+stable-prometheus-node-exporter-gvphf                    1/1     Running   0          38m
+stable-prometheus-node-exporter-j9dq4                    1/1     Running   0          38m
+
+ubuntu@node0:~$ kubectl get svc
+NAME                                      TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)                      AGE
+alertmanager-operated                     ClusterIP   None            <none>        9093/TCP,9094/TCP,9094/UDP   42m
+prometheus-operated                       ClusterIP   None            <none>        9090/TCP                     42m
+stable-grafana                            ClusterIP   10.233.35.129   <none>        80/TCP                       42m
+stable-kube-prometheus-sta-alertmanager   ClusterIP   10.233.36.128   <none>        9093/TCP,8080/TCP            42m
+stable-kube-prometheus-sta-operator       ClusterIP   10.233.7.191    <none>        443/TCP                      42m
+stable-kube-prometheus-sta-prometheus     ClusterIP   10.233.16.210   <none>        9090/TCP,8080/TCP            42m
+stable-kube-state-metrics                 ClusterIP   10.233.4.73     <none>        8080/TCP                     42m
+stable-prometheus-node-exporter           ClusterIP   10.233.2.45     <none>        9100/TCP                     42m
+
+```
+6. Для доступа к Grafana из вне кластера, отредактировал текущий конфигурационный файл svc:
+
+```
+metadata:
+  labels:
+    app.kubernetes.io/name: grafana
+  name: grafana-nodeport
+  namespace: monitoring
+spec:
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+      nodePort: 32000
+```
+7. Доступ по http к web интерфейсу Grafana:
+
+![Grafana](IMG/Grafana.PNG)
+
+8. Для входа необходимо получить пароль:
+
+```
+ubuntu@node0:~$ kubectl get secret --namespace monitoring stable-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+prom-operator
+```
+
+9. Теперь доступен мониторинг кластера Kubernetes:
+
+![Monitoring](IMG/Monitoring.PNG)
+
+10. Для установки ранее подготовленного приложения, воспользуюсь подготовленым для этого helm chart [my-app](https://github.com/Midzaru2011/myapp/tree/main/k8s/MyChart1):
+
+```shell
+ubuntu@node0:~$ kubectl create namespace myapp 
+namespace/myapp created
+
+ubuntu@node0:~$ helm repo add sasha https://midzaru2011.github.io/helm/
+"sasha" has been added to your repositories
+
+ubuntu@node0:~$ helm install myapp1 sasha/my-app --namespace myapp 
+NAME: myapp1
+LAST DEPLOYED: Sun Sep  1 18:05:18 2024
+NAMESPACE: myapp
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+---------------------------------------------------------
+
+Content of NOTES.txt appears after deploy.
+Deployed version 0.1.0.
+
+---------------------------------------------------------
+
+ubuntu@node0:~$ helm repo update
+Hang tight while we grab the latest from your chart repositories...
+...Successfully got an update from the "sasha" chart repository
+...Successfully got an update from the "prometheus-community" chart repository
+Update Complete. ⎈Happy Helming!⎈
+
+```
+11. 
 
 ### Установка и настройка CI/CD
 
