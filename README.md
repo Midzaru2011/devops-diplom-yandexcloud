@@ -140,11 +140,12 @@ zag1988@compute-vm-4-4-70-hdd-1725199716918:~$ yc compute instance list
 ## Решение
 
 1. Для установки кластера  k8s воспользовался отредактированной конфигурацией ansible из [Kubespray](https://kubernetes.io/docs/setup/production-environment/tools/kubespray/):
-   * При развертывании инфраструктуры через terraform, для использования ansible, прокинул публичные ключи [main.tf](terraform2/main.tf);
    * Склонировал репозиторий Kubespray: **git clone <https://github.com/kubernetes-sigs/kubespray.git>** на локальную машину;
-   * Переименовал каталог с inventory: **cd kubespray/ &&  cp -rfp inventory/sample inventory/mycluster**;
+   
    * Установил необходимые зависимости для выполнения playbook kubespray из requirements: **pip install -U -r requirements.txt**
-   * Для того, чтобы кластер k8s был доступен из интернета, в конфигах изменил параметр supplementary_addresses_in_ssl_keys [supplementary_addresses_in_ssl_keys](kubespray/mycluster/group_vars/k8s_cluster/k8s-cluster.yml) на EXTERNAL IP node-0, которая будет выступать мастер нодой;  
+
+   * При развертывании инфраструктуры через terraform, для использования ansible, прокинул публичные ключи [main.tf](terraform2/main.tf), для создания динамического файла [hosts.yaml](kubespray/inventory/mycluster/hosts.yaml) использовал инструкцию [pre_kubespray](terraform2/pre_kubespray.tf)
+
    * Запустил playbook для установки кластера k8s: **ansible-playbook -i inventory/mycluster/hosts.yaml  --become --become-user=root cluster.yml**;
    * Playbook успешно завершился:
 
