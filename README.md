@@ -229,6 +229,8 @@ node2   Ready    <none>          25m   v1.28.6
 
 </details>
 
+---
+
 # Создание тестового приложения
 
 <details><summary>Задание №3</summary>
@@ -359,6 +361,7 @@ node2   Ready    <none>          25m   v1.28.6
 
 docker pull midzaru2011/myapp:1.0.1
 
+---
 
 ## Подготовка cистемы мониторинга и деплой приложения
 
@@ -571,6 +574,8 @@ Update Complete. ⎈Happy Helming!⎈
 
 ![Node-1](IMG/Deployment.PNG)
 ![Node-2](IMG/Deployment1.PNG)
+
+---
 
 ## Установка и настройка CI/CD
 
@@ -917,6 +922,7 @@ Finished: SUCCESS
 
 ![alt text](IMG/Deployment3.PNG)
 
+---
 
 ## Что необходимо для сдачи задания?
 
