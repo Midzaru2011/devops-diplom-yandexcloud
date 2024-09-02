@@ -598,7 +598,7 @@ Update Complete. ⎈Happy Helming!⎈
 
 </details>
 
----
+
 
 ## Решение
 
